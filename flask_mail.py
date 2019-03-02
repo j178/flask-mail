@@ -39,6 +39,7 @@ if PY3:
     string_types = str,
     text_type = str
     from email import policy
+
     message_policy = policy.SMTP
 else:
     string_types = basestring,
@@ -86,8 +87,9 @@ def force_text(s, encoding='utf-8', errors='strict'):
             raise FlaskMailUnicodeDecodeError(s, *e.args)
         else:
             s = ' '.join([force_text(arg, encoding, strings_only,
-                    errors) for arg in s])
+                                     errors) for arg in s])
     return s
+
 
 def sanitize_subject(subject, encoding='utf-8'):
     try:
@@ -98,6 +100,7 @@ def sanitize_subject(subject, encoding='utf-8'):
         except UnicodeEncodeError:
             subject = Header(subject, 'utf-8').encode()
     return subject
+
 
 def sanitize_address(addr, encoding='utf-8'):
     if isinstance(addr, string_types):
@@ -131,6 +134,7 @@ def _has_newline(line):
         return True
     return False
 
+
 class Connection(object):
     """Handles connection to host."""
 
@@ -153,9 +157,13 @@ class Connection(object):
 
     def configure_host(self):
         if self.mail.use_ssl:
-            host = smtplib.SMTP_SSL(self.mail.server, self.mail.port)
+            host = smtplib.SMTP_SSL(self.mail.server, self.mail.port,
+                                    local_hostname=self.mail.local_hostname,
+                                    source_address=self.mail.source_address)
         else:
-            host = smtplib.SMTP(self.mail.server, self.mail.port)
+            host = smtplib.SMTP(self.mail.server, self.mail.port,
+                                local_hostname=self.mail.local_hostname,
+                                source_address=self.mail.source_address)
 
         host.set_debuglevel(int(self.mail.debug))
 
@@ -175,8 +183,8 @@ class Connection(object):
         assert message.send_to, "No recipients have been added"
 
         assert message.sender, (
-                "The message does not specify a sender and a default sender "
-                "has not been configured")
+            "The message does not specify a sender and a default sender "
+            "has not been configured")
 
         if message.has_bad_headers():
             raise BadHeaderError
@@ -398,7 +406,7 @@ class Message(object):
     def as_bytes(self):
         if PY34:
             return self._message().as_bytes()
-        else: # fallback for old Python (3) versions
+        else:  # fallback for old Python (3) versions
             return self._message().as_string().encode(self.charset or 'utf-8')
 
     def __str__(self):
@@ -463,7 +471,7 @@ class Message(object):
         :param disposition: content-disposition (if any)
         """
         self.attachments.append(
-            Attachment(filename, content_type, data, disposition, headers))
+                Attachment(filename, content_type, data, disposition, headers))
 
 
 class _MailMixin(object):
@@ -528,7 +536,8 @@ class _MailMixin(object):
 class _Mail(_MailMixin):
     def __init__(self, server, username, password, port, use_tls, use_ssl,
                  default_sender, debug, max_emails, suppress,
-                 ascii_attachments=False):
+                 ascii_attachments=False, local_host=None,
+                 source_address=None):
         self.server = server
         self.username = username
         self.password = password
@@ -540,6 +549,8 @@ class _Mail(_MailMixin):
         self.max_emails = max_emails
         self.suppress = suppress
         self.ascii_attachments = ascii_attachments
+        self.local_host = local_host
+        self.source_address = source_address
 
 
 class Mail(_MailMixin):
@@ -557,17 +568,19 @@ class Mail(_MailMixin):
 
     def init_mail(self, config, debug=False, testing=False):
         return _Mail(
-            config.get('MAIL_SERVER', '127.0.0.1'),
-            config.get('MAIL_USERNAME'),
-            config.get('MAIL_PASSWORD'),
-            config.get('MAIL_PORT', 25),
-            config.get('MAIL_USE_TLS', False),
-            config.get('MAIL_USE_SSL', False),
-            config.get('MAIL_DEFAULT_SENDER'),
-            int(config.get('MAIL_DEBUG', debug)),
-            config.get('MAIL_MAX_EMAILS'),
-            config.get('MAIL_SUPPRESS_SEND', testing),
-            config.get('MAIL_ASCII_ATTACHMENTS', False)
+                config.get('MAIL_SERVER', '127.0.0.1'),
+                config.get('MAIL_USERNAME'),
+                config.get('MAIL_PASSWORD'),
+                config.get('MAIL_PORT', 25),
+                config.get('MAIL_USE_TLS', False),
+                config.get('MAIL_USE_SSL', False),
+                config.get('MAIL_DEFAULT_SENDER'),
+                int(config.get('MAIL_DEBUG', debug)),
+                config.get('MAIL_MAX_EMAILS'),
+                config.get('MAIL_SUPPRESS_SEND', testing),
+                config.get('MAIL_ASCII_ATTACHMENTS', False),
+                config.get('MAIL_LOCAL_HOSTNAME', None),
+                config.get('MAIL_SOURCE_ADDRESS', None)
         )
 
     def init_app(self, app):
