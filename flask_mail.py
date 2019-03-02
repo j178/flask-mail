@@ -19,7 +19,6 @@ import smtplib
 import sys
 import time
 import unicodedata
-import ssl
 from email import charset
 from email.encoders import encode_base64
 from email.mime.base import MIMEBase
@@ -135,12 +134,15 @@ def _has_newline(line):
     return False
 
 
+_fqdn = None
+
+
 def _cached_getfqdn():
-    global fqdn
-    if fqdn is None:
+    global _fqdn
+    if _fqdn is None:
         import socket
-        fqdn = socket.getfqdn()
-    return fqdn
+        _fqdn = socket.getfqdn()
+    return _fqdn
 
 
 class Connection(object):
@@ -166,18 +168,18 @@ class Connection(object):
     def configure_host(self):
         origin_level = smtplib.SMTP.debuglevel
         smtplib.SMTP.debuglevel = int(self.mail.debug)
-
-        if self.mail.use_ssl:
-            host = smtplib.SMTP_SSL(self.mail.server, self.mail.port,
+        try:
+            if self.mail.use_ssl:
+                host = smtplib.SMTP_SSL(self.mail.server, self.mail.port,
+                                        local_hostname=self.mail.local_hostname,
+                                        source_address=self.mail.source_address)
+            else:
+                host = smtplib.SMTP(self.mail.server, self.mail.port,
                                     local_hostname=self.mail.local_hostname,
                                     source_address=self.mail.source_address)
-        else:
-            host = smtplib.SMTP(self.mail.server, self.mail.port,
-                                local_hostname=self.mail.local_hostname,
-                                source_address=self.mail.source_address)
-
-        smtplib.SMTP.debuglevel = origin_level
-        host.set_debuglevel(int(self.mail.debug))
+            host.set_debuglevel(int(self.mail.debug))
+        finally:
+            smtplib.SMTP.debuglevel = origin_level
 
         if self.mail.use_tls:
             host.starttls()
@@ -548,7 +550,7 @@ class _MailMixin(object):
 class _Mail(_MailMixin):
     def __init__(self, server, username, password, port, use_tls, use_ssl,
                  default_sender, debug, max_emails, suppress,
-                 ascii_attachments=False, local_host=None,
+                 ascii_attachments=False, local_hostname=None,
                  source_address=None):
         self.server = server
         self.username = username
@@ -561,7 +563,7 @@ class _Mail(_MailMixin):
         self.max_emails = max_emails
         self.suppress = suppress
         self.ascii_attachments = ascii_attachments
-        self.local_host = local_host
+        self.local_hostname = local_hostname
         self.source_address = source_address
 
 
