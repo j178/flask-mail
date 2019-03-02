@@ -164,6 +164,9 @@ class Connection(object):
             self.host.quit()
 
     def configure_host(self):
+        origin_level = smtplib.SMTP.debuglevel
+        smtplib.SMTP.debuglevel = int(self.mail.debug)
+
         if self.mail.use_ssl:
             host = smtplib.SMTP_SSL(self.mail.server, self.mail.port,
                                     local_hostname=self.mail.local_hostname,
@@ -173,6 +176,7 @@ class Connection(object):
                                 local_hostname=self.mail.local_hostname,
                                 source_address=self.mail.source_address)
 
+        smtplib.SMTP.debuglevel = origin_level
         host.set_debuglevel(int(self.mail.debug))
 
         if self.mail.use_tls:
