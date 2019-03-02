@@ -19,7 +19,7 @@ import smtplib
 import sys
 import time
 import unicodedata
-
+import ssl
 from email import charset
 from email.encoders import encode_base64
 from email.mime.base import MIMEBase
@@ -133,6 +133,14 @@ def _has_newline(line):
     if line and ('\r' in line or '\n' in line):
         return True
     return False
+
+
+def _cached_getfqdn():
+    global fqdn
+    if fqdn is None:
+        import socket
+        fqdn = socket.getfqdn()
+    return fqdn
 
 
 class Connection(object):
@@ -295,7 +303,7 @@ class Message(object):
         self.alts = dict(alts or {})
         self.html = html
         self.date = date
-        self.msgId = make_msgid()
+        self.msgId = make_msgid(domain=_cached_getfqdn())
         self.charset = charset
         self.extra_headers = extra_headers
         self.mail_options = mail_options or []
